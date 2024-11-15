@@ -98,6 +98,8 @@ public class AplikasiCekCuacaSederhana extends javax.swing.JFrame {
                 "Kota", "Cuaca", "Suhu"
             }
         ));
+        dataTable.setEnabled(false);
+        dataTable.setFocusable(false);
         jScrollPane1.setViewportView(dataTable);
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
@@ -174,6 +176,12 @@ public class AplikasiCekCuacaSederhana extends javax.swing.JFrame {
         if (kota.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Silakan masukkan nama kota");
             return;
+        }
+
+        // Update check count and add to favorites if checked frequently
+        cityCheckCount.put(kota, cityCheckCount.getOrDefault(kota, 0) + 1);
+        if (cityCheckCount.get(kota) >= 3) { // Setelah 3 kali dicek
+            addToFavorites(kota);
         }
 
         String apiKey = "7fcfd4f75d211a119ca9eeff8532f936"; // Ganti dengan API key Anda
@@ -254,10 +262,13 @@ public class AplikasiCekCuacaSederhana extends javax.swing.JFrame {
     }//GEN-LAST:event_simpanButtonActionPerformed
 
     private void lokasiComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_lokasiComboBoxItemStateChanged
-        // TODO add your handling code here:
         if (evt.getStateChange() == ItemEvent.SELECTED) {
             String selectedCity = (String) lokasiComboBox.getSelectedItem();
-            kotaTextField.setText(selectedCity);
+            if (selectedCity != null && !selectedCity.equals("Pilih Lokasi")) {
+                kotaTextField.setText(selectedCity);
+                // Automatically check weather for selected city
+                checkWeatherForCity(selectedCity);
+            }
         }
     }//GEN-LAST:event_lokasiComboBoxItemStateChanged
 
@@ -460,6 +471,28 @@ public class AplikasiCekCuacaSederhana extends javax.swing.JFrame {
         try (FileWriter writer = new FileWriter("weatherData.csv", true)) {
             writer.append(String.format("%s,%s,%.1f\n", kota, cuaca, suhu));
         } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void checkWeatherForCity(String kota) {
+        String apiKey = "7fcfd4f75d211a119ca9eeff8532f936";
+        String url = "http://api.openweathermap.org/data/2.5/weather?q=" + kota + "&appid=" + apiKey + "&units=metric&lang=id";
+
+        try {
+            String response = getWeatherData(url);
+            JSONObject jsonResponse = new JSONObject(response);
+
+            String kondisiCuaca = jsonResponse.getJSONArray("weather").getJSONObject(0).getString("description");
+            kondisiCuaca = translateWeatherDescription(kondisiCuaca);
+            double suhu = jsonResponse.getJSONObject("main").getDouble("temp");
+
+            cuacaLabel.setText("Cuaca: " + kondisiCuaca + ", Suhu: " + String.format("%.1f°C", suhu));
+            setWeatherIcon(kondisiCuaca);
+            updateTableData(kota, kondisiCuaca, suhu);
+
+        } catch (Exception e) {
+            cuacaLabel.setText("Error mengambil data cuaca untuk " + kota);
             e.printStackTrace();
         }
     }
